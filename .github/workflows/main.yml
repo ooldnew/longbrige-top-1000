@@ -1,0 +1,38 @@
+name: Global Stock Downloader
+
+on:
+  workflow_dispatch: # 支持点击按钮运行
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      LP_APP_KEY: ${{ secrets.LP_APP_KEY }}
+      LP_APP_SECRET: ${{ secrets.LP_APP_SECRET }}
+      LP_ACCESS_TOKEN: ${{ secrets.LP_ACCESS_TOKEN }}
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Install
+      run: pip install pandas tqdm longport pyarrow
+
+    - name: Run Step 1
+      run: python step1_build_top1000.py
+
+    - name: Run Step 2
+      run: python step2_download_ohlcv.py
+
+    - name: Upload
+      uses: actions/upload-artifact@v4
+      with:
+        name: final-data
+        path: |
+          top1000_by_year.csv
+          prices_all.parquet
