@@ -17,18 +17,17 @@ jobs:
 
       - name: 安装依赖
         run: |
-          python -m pip install --upgrade pip
+          pip install --upgrade pip
           pip install longbridge pandas tqdm
 
       - name: 开始下载
         env:
-          # 关键：新版SDK必须用 LONGBRIDGE_*
           LONGBRIDGE_APP_KEY: ${{ secrets.LP_APP_KEY }}
           LONGBRIDGE_APP_SECRET: ${{ secrets.LP_APP_SECRET }}
           LONGBRIDGE_ACCESS_TOKEN: ${{ secrets.LP_ACCESS_TOKEN }}
         run: python step2_download_ohlcv.py
 
-      - name: 打包并生成下载按钮
+      - name: 打包数据
         uses: actions/upload-artifact@v4
         with:
           name: us_1000_turnover_data
