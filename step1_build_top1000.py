@@ -1,7 +1,7 @@
 import pandas as pd
 import os
 from tqdm import tqdm
-from longbridge.openapi import Config, QuoteContext
+from longbridge.openapi import Config, QuoteContext, Period, AdjustType
 
 LB_APP_KEY = os.getenv("LP_APP_KEY")
 LB_APP_SECRET = os.getenv("LP_APP_SECRET")
@@ -22,7 +22,7 @@ def get_us_tickers():
 
 def get_all_years_turnover(sym):
     try:
-        klines = ctx.candlesticks(sym, "day", 1300, "none")
+        klines = ctx.candlesticks(sym, Period.Day, 1300, AdjustType.NoAdjust)
         year_sum = {}
         for k in klines:
             y = k.timestamp.year
@@ -47,8 +47,7 @@ def main():
         done = set()
 
     todo = [t for t in tickers if t not in done]
-    todo = todo[:3]  # 临时只测3只，看错误信息
-    print(f"待获取：{len(todo)} 只")
+    print(f"待获取：{len(todo)} 只，已完成：{len(done)} 只")
 
     success_count = 0
     error_count = 0
@@ -65,6 +64,8 @@ def main():
             pd.DataFrame([{"year":0,"symbol":sym,"turnover":0}]).to_csv(
                 CACHE_FILE, mode="a", header=False, index=False)
             error_count += 1
+            if error_count <= 20:
+                print(f"\n[NO DATA] {sym}")
 
     print(f"\n获取完成：有数据 {success_count}，无数据/失败 {error_count}")
 
