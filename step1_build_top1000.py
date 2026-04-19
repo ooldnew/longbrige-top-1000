@@ -16,8 +16,7 @@ CACHE_FILE = "step1_progress_cache.csv"
 OUTPUT_CSV = "top1000_by_year.csv"
 
 def get_us_tickers():
-    url = "https://raw.githubusercontent.com/Ate329/top-us-stock-tickers/main/tickers/all.csv"
-    df = pd.read_csv(url)
+    df = pd.read_csv("all.csv")
     return df[df["symbol"].str.match(r"^[A-Z]{1,5}$", na=False)].symbol.unique()
 
 def get_all_years_turnover(sym):
