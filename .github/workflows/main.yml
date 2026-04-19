@@ -22,12 +22,12 @@ jobs:
       - name: 调试longbridge版本和Config用法
         run: |
           pip show longbridge
-          python -c "
+          python << 'EOF'
 import longbridge
 print('版本:', longbridge.__version__)
 from longbridge.openapi import Config
 print('Config方法:', [m for m in dir(Config) if not m.startswith('_')])
-"
+EOF
 
       - name: 运行 Step1 生成股票名单
         env:
