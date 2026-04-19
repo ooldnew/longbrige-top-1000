@@ -21,9 +21,7 @@ def get_us_tickers():
     return df[df["symbol"].str.match(r"^[A-Z]{1,5}$", na=False)].symbol.unique()
 
 def get_all_years_turnover(sym):
-    """拉取足够多的K线覆盖2021-2025，按年汇总turnover"""
     try:
-        # count=1300 覆盖约5年交易日
         klines = ctx.candlesticks(sym, "day", 1300, "none")
         year_sum = {}
         for k in klines:
@@ -32,6 +30,7 @@ def get_all_years_turnover(sym):
                 year_sum[y] = year_sum.get(y, 0.0) + float(k.turnover)
         return year_sum
     except Exception as e:
+        print(f"\n[ERROR] {sym}: {type(e).__name__}: {e}")
         return {}
 
 def main():
@@ -48,7 +47,8 @@ def main():
         done = set()
 
     todo = [t for t in tickers if t not in done]
-    print(f"待获取：{len(todo)} 只，已完成：{len(done)} 只")
+    todo = todo[:3]  # 临时只测3只，看错误信息
+    print(f"待获取：{len(todo)} 只")
 
     success_count = 0
     error_count = 0
@@ -65,8 +65,6 @@ def main():
             pd.DataFrame([{"year":0,"symbol":sym,"turnover":0}]).to_csv(
                 CACHE_FILE, mode="a", header=False, index=False)
             error_count += 1
-            if error_count <= 20:
-                print(f"\n[NO DATA] {sym}")
 
     print(f"\n获取完成：有数据 {success_count}，无数据/失败 {error_count}")
 
