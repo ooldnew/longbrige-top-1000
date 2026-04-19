@@ -1,7 +1,8 @@
 import pandas as pd
 import os
+from datetime import date
 from tqdm import tqdm
-from longbridge.openapi import Config, QuoteContext
+from longbridge.openapi import Config, QuoteContext, Period, AdjustType
 
 LB_APP_KEY = os.getenv("LP_APP_KEY")
 LB_APP_SECRET = os.getenv("LP_APP_SECRET")
@@ -12,7 +13,7 @@ TOP_N = 1000
 CACHE_FILE = "step1_progress_cache.csv"
 OUTPUT_CSV = "top1000_by_year.csv"
 
-config = Config(LB_APP_KEY, LB_APP_SECRET, LB_ACCESS_TOKEN)
+config = Config(app_key=LB_APP_KEY, app_secret=LB_APP_SECRET, access_token=LB_ACCESS_TOKEN)
 ctx = QuoteContext(config)
 
 def get_us_tickers():
@@ -20,15 +21,24 @@ def get_us_tickers():
     df = pd.read_csv(url)
     return df[df["symbol"].str.match(r"^[A-Z]{1,5}$", na=False)].symbol.unique()
 
-def get_year_turnover(sym, year):
+def get_all_years_turnover(sym):
+    """一次请求拉完2021-2025全部日K，按年汇总turnover"""
     try:
         klines = ctx.history_candlesticks_by_date(
-            sym, "day", f"{year}-01-01", f"{year}-12-31", adjust_type="no_adjust"
+            sym,
+            Period.Day,
+            AdjustType.NoAdjust,
+            date(2021, 1, 1),
+            date(2025, 12, 31),
         )
-        total = sum(float(k.turnover) for k in klines)
-        return total if total > 0 else None
-    except Exception:
-        return None
+        year_sum = {}
+        for k in klines:
+            y = k.timestamp.year
+            if y in YEARS:
+                year_sum[y] = year_sum.get(y, 0.0) + float(k.turnover)
+        return year_sum
+    except Exception as e:
+        return {}
 
 def main():
     tickers = get_us_tickers()
@@ -48,27 +58,28 @@ def main():
 
     success_count = 0
     error_count = 0
+    quota_errors = 0
 
     for t in tqdm(todo):
         sym = f"{t}.US"
-        rows = []
-        for year in YEARS:
-            v = get_year_turnover(sym, year)
-            if v:
-                rows.append({"year": year, "symbol": sym, "turnover": v})
-            # 无 sleep，由长桥SDK自动限流
+        year_sum = get_all_years_turnover(sym)
 
-        if rows:
+        if year_sum:
+            rows = [{"year": y, "symbol": sym, "turnover": v} for y, v in year_sum.items()]
             pd.DataFrame(rows).to_csv(CACHE_FILE, mode="a", header=False, index=False)
             success_count += 1
         else:
+            # 占位，避免重复请求
             pd.DataFrame([{"year":0,"symbol":sym,"turnover":0}]).to_csv(
                 CACHE_FILE, mode="a", header=False, index=False)
             error_count += 1
-            if error_count <= 10:
-                print(f"\n[NO DATA] {sym}")
+            quota_errors += 1
+            if quota_errors <= 20:
+                print(f"\n[NO DATA] {sym}（可能超出月度配额或无数据）")
 
     print(f"\n获取完成：有数据 {success_count}，无数据/失败 {error_count}")
+    if quota_errors > 10:
+        print(f"⚠️  警告：{quota_errors} 只无数据，请检查账户月度配额是否用尽（301607错误）")
 
     df = pd.read_csv(CACHE_FILE)
     df = df[df["year"].isin(YEARS)]
