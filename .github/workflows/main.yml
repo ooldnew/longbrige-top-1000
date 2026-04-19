@@ -14,19 +14,26 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: 安装依赖（强制旧版长桥）
+      - name: 安装旧版长桥
         run: |
           pip install --upgrade pip
           pip install "longbridge<3.0.0" pandas tqdm
 
-      - name: 开始下载
+      - name: 运行 Step1 生成股票名单
+        env:
+          LP_APP_KEY: ${{ secrets.LP_APP_KEY }}
+          LP_APP_SECRET: ${{ secrets.LP_APP_SECRET }}
+          LP_ACCESS_TOKEN: ${{ secrets.LP_ACCESS_TOKEN }}
+        run: python step1_build_top1000.py
+
+      - name: 运行 Step2 下载行情
         env:
           LP_APP_KEY: ${{ secrets.LP_APP_KEY }}
           LP_APP_SECRET: ${{ secrets.LP_APP_SECRET }}
           LP_ACCESS_TOKEN: ${{ secrets.LP_ACCESS_TOKEN }}
         run: python step2_download_ohlcv.py
 
-      - name: 打包并生成下载按钮
+      - name: 打包下载
         uses: actions/upload-artifact@v4
         with:
           name: us_1000_turnover_data
