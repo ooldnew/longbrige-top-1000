@@ -2,63 +2,71 @@ import os
 import time
 import pandas as pd
 from tqdm import tqdm
-from longbridge import Config, QuoteContext  # <-- 这里修复了
 
-# ===================== 长桥配置 =====================
+# ===================== 长桥 新版 SDK 正确导入 =====================
+from longbridge.http import HttpClient
+from datetime import datetime
+
+# ===================== 配置 =====================
 LB_APP_KEY = os.getenv("LB_APP_KEY")
 LB_APP_SECRET = os.getenv("LB_APP_SECRET")
 LB_ACCESS_TOKEN = os.getenv("LB_ACCESS_TOKEN")
 
-# 下载年份
 YEARS = [2021, 2022, 2023, 2024, 2025]
-
-# 根目录
 BASE_DIR = "us_1000_turnover"
+DELAY = 0.3
+# ==================================================
+
+# 初始化长桥 HTTP 客户端（新版唯一正确方式）
+http = HttpClient(
+    app_key=LB_APP_KEY,
+    app_secret=LB_APP_SECRET,
+    access_token=LB_ACCESS_TOKEN
+)
+
 os.makedirs(BASE_DIR, exist_ok=True)
-
-# 限流（避免触发限制）
-DELAY_SECONDS = 0.3
-# ====================================================
-
-# 初始化长桥（已修复）
-config = Config(LB_APP_KEY, LB_APP_SECRET, LB_ACCESS_TOKEN)
-quote_ctx = QuoteContext(config)
-
-# 读取股票池
 df_symbols = pd.read_csv("top1000_by_year.csv")
+failed = []
 
-# 失败记录
-failed_records = []
-
-def download_one(symbol, year):
+# ===================== 下载 K 线 =====================
+def download_stock(symbol, year):
     try:
         start = f"{year}-01-01"
         end = f"{year}-12-31"
 
-        resp = quote_ctx.candlesticks(
-            symbol=symbol,
-            period="day",
-            start=start,
-            end=end,
-            adjust="forward"
+        # 长桥 新版 API 接口
+        resp = http.request(
+            method="GET",
+            path="/v1/quote/candlestick",
+            query={
+                "symbol": symbol,
+                "period": "day",
+                "start": start,
+                "end": end,
+                "adjust_type": "forward"
+            }
         )
 
-        rows = []
-        for bar in resp:
-            rows.append({
-                "date": bar.timestamp.strftime("%Y-%m-%d"),
-                "open": bar.open,
-                "high": bar.high,
-                "low": bar.low,
-                "close": bar.close,
-                "volume": bar.volume,
-                "turnover": bar.turnover,
-            })
+        data = resp.get("data", {})
+        bars = data.get("candlesticks", [])
+        if not bars:
+            return None
 
+        rows = []
+        for b in bars:
+            rows.append({
+                "date": datetime.fromtimestamp(b["timestamp"]).strftime("%Y-%m-%d"),
+                "open": b["open"],
+                "high": b["high"],
+                "low": b["low"],
+                "close": b["close"],
+                "volume": b["volume"],
+                "turnover": b["turnover"]
+            })
         return pd.DataFrame(rows)
 
     except Exception as e:
-        print(f"[异常] {symbol} | {str(e)}")
+        print(f"失败 {symbol}: {str(e)}")
         return None
 
 # ===================== 按年份下载 =====================
@@ -66,28 +74,24 @@ for year in YEARS:
     year_dir = os.path.join(BASE_DIR, str(year))
     os.makedirs(year_dir, exist_ok=True)
 
-    df_y = df_symbols[df_symbols["year"] == year].head(1000)
-    symbols = df_y["symbol"].tolist()
+    df_year = df_symbols[df_symbols["year"] == year].head(1000)
+    symbols = df_year["symbol"].tolist()
 
-    print(f"\n===== {year} 年 前1000只 开始下载 =====")
+    print(f"\n=== 下载 {year} 年 前1000只 ===")
 
-    for symbol in tqdm(symbols, desc=f"{year}"):
+    for symbol in tqdm(symbols):
         csv_path = os.path.join(year_dir, f"{symbol}.csv")
-
-        # ===================== 断点续传 =====================
         if os.path.exists(csv_path):
             continue
 
-        df = download_one(symbol, year)
+        df = download_stock(symbol, year)
+        if df is not None and not df.empty:
+            df.to_csv(csv_path, index=False, encoding="utf-8-sig")
+        else:
+            failed.append([year, symbol])
 
-        if df is None or df.empty:
-            failed_records.append({"year": year, "symbol": symbol})
-            continue
-
-        df.to_csv(csv_path, index=False, encoding="utf-8-sig")
-        time.sleep(DELAY_SECONDS)
+        time.sleep(DELAY)
 
 # 保存失败清单
-pd.DataFrame(failed_records).to_csv("failed_symbols.csv", index=False)
-print(f"\n✅ 全部完成！失败数量：{len(failed_records)}")
-print(f"📂 文件保存在：{BASE_DIR}/")
+pd.DataFrame(failed, columns=["year", "symbol"]).to_csv("failed_symbols.csv", index=False)
+print(f"\n✅ 全部完成！文件在：{BASE_DIR}")
