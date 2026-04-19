@@ -1,10 +1,13 @@
 import pandas as pd
 import os
-from datetime import date
 from tqdm import tqdm
-from longbridge.openapi import Config, QuoteContext, Period, AdjustType
+from longbridge.openapi import Config, QuoteContext
 
-config = Config.from_env()
+LB_APP_KEY = os.getenv("LP_APP_KEY")
+LB_APP_SECRET = os.getenv("LP_APP_SECRET")
+LB_ACCESS_TOKEN = os.getenv("LP_ACCESS_TOKEN")
+
+config = Config(LB_APP_KEY, LB_APP_SECRET, LB_ACCESS_TOKEN)
 ctx = QuoteContext(config)
 
 YEARS = [2021, 2022, 2023, 2024, 2025]
@@ -18,14 +21,10 @@ def get_us_tickers():
     return df[df["symbol"].str.match(r"^[A-Z]{1,5}$", na=False)].symbol.unique()
 
 def get_all_years_turnover(sym):
+    """拉取足够多的K线覆盖2021-2025，按年汇总turnover"""
     try:
-        klines = ctx.history_candlesticks_by_date(
-            sym,
-            Period.Day,
-            AdjustType.NoAdjust,
-            date(2021, 1, 1),
-            date(2025, 12, 31),
-        )
+        # count=1300 覆盖约5年交易日
+        klines = ctx.candlesticks(sym, "day", 1300, "none")
         year_sum = {}
         for k in klines:
             y = k.timestamp.year
@@ -53,7 +52,6 @@ def main():
 
     success_count = 0
     error_count = 0
-    quota_errors = 0
 
     for t in tqdm(todo):
         sym = f"{t}.US"
@@ -67,13 +65,10 @@ def main():
             pd.DataFrame([{"year":0,"symbol":sym,"turnover":0}]).to_csv(
                 CACHE_FILE, mode="a", header=False, index=False)
             error_count += 1
-            quota_errors += 1
-            if quota_errors <= 20:
-                print(f"\n[NO DATA] {sym}（可能超出月度配额或无数据）")
+            if error_count <= 20:
+                print(f"\n[NO DATA] {sym}")
 
     print(f"\n获取完成：有数据 {success_count}，无数据/失败 {error_count}")
-    if quota_errors > 10:
-        print(f"⚠️  警告：{quota_errors} 只无数据，请检查账户月度配额是否用尽（301607错误）")
 
     df = pd.read_csv(CACHE_FILE)
     df = df[df["year"].isin(YEARS)]
