@@ -4,10 +4,11 @@ import pandas as pd
 from tqdm import tqdm
 from longbridge.openapi import Config, QuoteContext
 
-# ===================== 密钥已按你的名字修正 =====================
-LB_APP_KEY = os.getenv("LP_APP_KEY")
-LB_APP_SECRET = os.getenv("LP_APP_SECRET")
-LB_ACCESS_TOKEN = os.getenv("LP_ACCESS_TOKEN")
+# ===================== 新版SDK正确用法 =====================
+# 新版要求：
+# 1. 环境变量名必须是 LONGBRIDGE_*
+# 2. Config.from_env() 自动读取环境变量
+# ===========================================================
 
 # 下载年份
 YEARS = [2021, 2022, 2023, 2024, 2025]
@@ -18,10 +19,9 @@ os.makedirs(BASE_DIR, exist_ok=True)
 
 # 延迟防限流
 DELAY_SECONDS = 0.3
-# =================================================================
 
-# 初始化长桥
-config = Config(LB_APP_KEY, LB_APP_SECRET, LB_ACCESS_TOKEN)
+# ===================== 正确初始化Config =====================
+config = Config.from_env()  # 自动读取 LONGBRIDGE_APP_KEY 等
 quote_ctx = QuoteContext(config)
 
 # 读取股票列表
