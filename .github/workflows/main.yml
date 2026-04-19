@@ -20,14 +20,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install longbridge pandas tqdm
 
-      - name: 下载数据（断点续传）
+      - name: 开始下载
         env:
-          LB_APP_KEY: ${{ secrets.LB_APP_KEY }}
-          LB_APP_SECRET: ${{ secrets.LB_APP_SECRET }}
-          LB_ACCESS_TOKEN: ${{ secrets.LB_ACCESS_TOKEN }}
+          LP_APP_KEY: ${{ secrets.LP_APP_KEY }}
+          LP_APP_SECRET: ${{ secrets.LP_APP_SECRET }}
+          LP_ACCESS_TOKEN: ${{ secrets.LP_ACCESS_TOKEN }}
         run: python step2_download_ohlcv.py
 
-      - name: 打包全部数据
+      - name: 打包并生成下载按钮
         uses: actions/upload-artifact@v4
         with:
           name: us_1000_turnover_data
