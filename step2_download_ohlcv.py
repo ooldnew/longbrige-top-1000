@@ -1,63 +1,93 @@
-﻿import os
+import os
 import time
 import pandas as pd
-from pathlib import Path
 from tqdm import tqdm
-from longport.openapi import Config, QuoteContext, Period, AdjustType
-import config
+from longbridge.openapi import Config, QuoteContext
 
-def download_one(ctx, symbol):
-    # 长桥单次限制 1000 条，分两段拉取 5 年数据
-    segments = [(config.LONGPORT_START, "2022-12-31"), ("2023-01-01", config.LONGPORT_END)]
-    rows = []
-    for start, end in segments:
-        try:
-            candles = ctx.history_candlesticks_by_date(
-                symbol=symbol, period=Period.Day,
-                start=start, end=end, adjust_type=AdjustType.ForwardAdjust
-            )
-            for c in candles:
-                rows.append({
-                    "date": c.timestamp.date(),
-                    "open": float(c.open), "high": float(c.high),
-                    "low": float(c.low), "close": float(c.close),
-                    "volume": int(c.volume), "turnover": float(c.turnover),
-                    "symbol": symbol
-                })
-        except Exception:
+# ===================== 长桥配置 =====================
+LB_APP_KEY = os.getenv("LB_APP_KEY")
+LB_APP_SECRET = os.getenv("LB_APP_SECRET")
+LB_ACCESS_TOKEN = os.getenv("LB_ACCESS_TOKEN")
+
+# 下载年份
+YEARS = [2021, 2022, 2023, 2024, 2025]
+
+# 根目录
+BASE_DIR = "us_1000_turnover"
+os.makedirs(BASE_DIR, exist_ok=True)
+
+# 限流
+DELAY_SECONDS = 0.25
+# ====================================================
+
+# 初始化长桥
+config = Config(LB_APP_KEY, LB_APP_SECRET, LB_ACCESS_TOKEN)
+quote_ctx = QuoteContext(config)
+
+# 读取股票池
+df_symbols = pd.read_csv("top1000_by_year.csv")
+
+# 失败记录
+failed_records = []
+
+def download_one(symbol, year):
+    try:
+        start = f"{year}-01-01"
+        end = f"{year}-12-31"
+
+        resp = quote_ctx.candlesticks(
+            symbol=symbol,
+            period="day",
+            start=start,
+            end=end,
+            adjust="forward"
+        )
+
+        rows = []
+        for bar in resp:
+            rows.append({
+                "date": bar.timestamp.strftime("%Y-%m-%d"),
+                "open": bar.open,
+                "high": bar.high,
+                "low": bar.low,
+                "close": bar.close,
+                "volume": bar.volume,
+                "turnover": bar.turnover,
+            })
+
+        return pd.DataFrame(rows)
+
+    except Exception as e:
+        print(f"[异常] {symbol} | {str(e)}")
+        return None
+
+# ===================== 按年份下载 =====================
+for year in YEARS:
+    year_dir = os.path.join(BASE_DIR, str(year))
+    os.makedirs(year_dir, exist_ok=True)
+
+    df_y = df_symbols[df_symbols["year"] == year].head(1000)
+    symbols = df_y["symbol"].tolist()
+
+    print(f"\n===== {year} 年 前1000只 开始下载 =====")
+
+    for symbol in tqdm(symbols, desc=f"{year}"):
+        csv_path = os.path.join(year_dir, f"{symbol}.csv")
+
+        # ===================== 断点续传 =====================
+        if os.path.exists(csv_path):
             continue
-    return pd.DataFrame(rows) if rows else None
 
-def main():
-    if not os.path.exists(config.TOP1000_CSV):
-        print("❌ 请先运行 Step 1")
-        return
+        df = download_one(symbol, year)
 
-    top1000 = pd.read_csv(config.TOP1000_CSV)
-    all_symbols = sorted(top1000["symbol"].unique().tolist())
-    
-    os.makedirs(config.PRICES_DIR, exist_ok=True)
-    done = {p.stem for p in Path(config.PRICES_DIR).glob("*.parquet")}
-    todo = [s for s in all_symbols if s.replace(".US", "") not in done]
-    
-    print(f"待下载: {len(todo)} 只")
-    
-    if todo:
-        cfg = Config(config.APP_KEY, config.APP_SECRET, config.ACCESS_TOKEN)
-        ctx = QuoteContext(cfg)
-        for s in tqdm(todo):
-            df = download_one(ctx, s)
-            if df is not None:
-                ticker = s.replace(".US", "")
-                df.to_parquet(Path(config.PRICES_DIR) / f"{ticker}.parquet")
-            time.sleep(config.REQUEST_DELAY)
+        if df is None or df.empty:
+            failed_records.append({"year": year, "symbol": symbol})
+            continue
 
-    # 合并
-    print("▶ 正在合并全量文件...")
-    all_dfs = [pd.read_parquet(p) for p in Path(config.PRICES_DIR).glob("*.parquet")]
-    if all_dfs:
-        pd.concat(all_dfs).to_parquet(config.PRICES_ALL, index=False)
-        print(f"✅ 完成！大文件保存在: {config.PRICES_ALL}")
+        df.to_csv(csv_path, index=False, encoding="utf-8-sig")
+        time.sleep(DELAY_SECONDS)
 
-if __name__ == "__main__":
-    main()
+# 保存失败清单
+pd.DataFrame(failed_records).to_csv("failed_symbols.csv", index=False)
+print(f"\n✅ 全部完成！失败数量：{len(failed_records)}")
+print(f"📂 文件保存在：{BASE_DIR}/")
