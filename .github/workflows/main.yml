@@ -1,44 +1,34 @@
-name: Global Stock Downloader
+name: 下载美股每年前1000只
 
 on:
-  workflow_dispatch: 
+  workflow_dispatch:
 
 jobs:
-  build:
+  download:
     runs-on: ubuntu-latest
-    # 赋予 Action 权限，让它能把进度文件 (.csv) 推送回你的仓库
-    permissions:
-      contents: write 
-      
-    env:
-      LP_APP_KEY: ${{ secrets.LP_APP_KEY }}
-      LP_APP_SECRET: ${{ secrets.LP_APP_SECRET }}
-      LP_ACCESS_TOKEN: ${{ secrets.LP_ACCESS_TOKEN }}
-
+    timeout-minutes: 360
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Setup Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.10'
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-    - name: Install
-      run: pip install pandas tqdm longport pyarrow
+      - name: 安装依赖
+        run: |
+          pip install --upgrade pip
+          pip install longbridge pandas tqdm
 
-    - name: Run Step 1 (Build List)
-      run: python step1_build_top1000.py
+      - name: 下载数据（断点续跑）
+        env:
+          LB_APP_KEY: ${{ secrets.LB_APP_KEY }}
+          LB_APP_SECRET: ${{ secrets.LB_APP_SECRET }}
+          LB_ACCESS_TOKEN: ${{ secrets.LB_ACCESS_TOKEN }}
+        run: python step2_download_ohlcv.py
 
-    - name: Run Step 2 (Download OHLCV)
-      run: python step2_download_ohlcv.py
-
-    - name: Save progress even on failure
-      if: always() # 无论成功还是超时，都执行存档
-      run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        # 存档缓存文件、最终名单以及已下载的部分行情
-        git add step1_progress_cache.csv top1000_by_year.csv failed_symbols.txt || true
-        git commit -m "自动存档下载进度 [skip ci]" || exit 0
-        git push
+      - name: 打包全部数据
+        uses: actions/upload-artifact@v4
+        with:
+          name: us_1000_turnover_data
+          path: us_1000_turnover/
