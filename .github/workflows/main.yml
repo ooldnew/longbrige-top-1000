@@ -1,11 +1,15 @@
 name: Global Stock Downloader
 
 on:
-  workflow_dispatch: # 支持点击按钮运行
+  workflow_dispatch: 
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    # 赋予 Action 权限，让它能把进度文件 (.csv) 推送回你的仓库
+    permissions:
+      contents: write 
+      
     env:
       LP_APP_KEY: ${{ secrets.LP_APP_KEY }}
       LP_APP_SECRET: ${{ secrets.LP_APP_SECRET }}
@@ -23,16 +27,18 @@ jobs:
     - name: Install
       run: pip install pandas tqdm longport pyarrow
 
-    - name: Run Step 1
+    - name: Run Step 1 (Build List)
       run: python step1_build_top1000.py
 
-    - name: Run Step 2
+    - name: Run Step 2 (Download OHLCV)
       run: python step2_download_ohlcv.py
 
-    - name: Upload
-      uses: actions/upload-artifact@v4
-      with:
-        name: final-data
-        path: |
-          top1000_by_year.csv
-          prices_all.parquet
+    - name: Save progress even on failure
+      if: always() # 无论成功还是超时，都执行存档
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        # 存档缓存文件、最终名单以及已下载的部分行情
+        git add step1_progress_cache.csv top1000_by_year.csv failed_symbols.txt || true
+        git commit -m "自动存档下载进度 [skip ci]" || exit 0
+        git push
