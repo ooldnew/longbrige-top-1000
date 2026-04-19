@@ -3,29 +3,36 @@ import time
 import pandas as pd
 from tqdm import tqdm
 from datetime import date
-from longbridge.openapi import (
+
+# ===================== 清理所有冲突 Config =====================
+from longbridge import (
     QuoteContext,
-    Config,
     Period,
-    AdjustType
+    AdjustType,
+)
+from longbridge.config import EnvConfig
+
+# 环境变量（你设置的 LP_*）
+config = EnvConfig(
+    app_key=os.getenv("LP_APP_KEY"),
+    app_secret=os.getenv("LP_APP_SECRET"),
+    access_token=os.getenv("LP_ACCESS_TOKEN"),
 )
 
-# ===================== 长桥 v4.0.5 官方标准写法 =====================
-# 从环境变量自动创建 config
-config = Config.from_env()
-quote_ctx = QuoteContext(config)
-
-# 配置
+# ===================== 固定配置 =====================
 YEARS = [2021, 2022, 2023, 2024, 2025]
 BASE_DIR = "us_1000_turnover"
 os.makedirs(BASE_DIR, exist_ok=True)
-DELAY = 0.4
+DELAY = 0.5
+
+# 初始化行情
+quote_ctx = QuoteContext(config)
 
 # 读取股票列表
 df_symbols = pd.read_csv("top1000_by_year.csv")
 failed_records = []
 
-# ===================== 官方 K线 接口 =====================
+# ===================== 下载 K线 =====================
 def download(symbol, year):
     try:
         resp = quote_ctx.history_candlesticks_by_date(
@@ -33,7 +40,7 @@ def download(symbol, year):
             period=Period.Day,
             adjust_type=AdjustType.Forward,
             start_date=date(year, 1, 1),
-            end_date=date(year, 12, 31)
+            end_date=date(year, 12, 31),
         )
 
         rows = []
@@ -60,7 +67,7 @@ for year in YEARS:
     df_year = df_symbols[df_symbols["year"] == year].head(1000)
     symbols = df_year["symbol"].tolist()
 
-    print(f"\n=== {year} 年 前1000只 ===")
+    print(f"\n===== {year} 年 前1000只 =====")
 
     for symbol in tqdm(symbols):
         csv_path = os.path.join(year_dir, f"{symbol}.csv")
