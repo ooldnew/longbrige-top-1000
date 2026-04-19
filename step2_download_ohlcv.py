@@ -1,10 +1,13 @@
 import os
 import pandas as pd
-from datetime import date
 from tqdm import tqdm
-from longbridge.openapi import Config, QuoteContext, Period, AdjustType
+from longbridge.openapi import Config, QuoteContext
 
-config = Config.from_env()
+LB_APP_KEY = os.getenv("LP_APP_KEY")
+LB_APP_SECRET = os.getenv("LP_APP_SECRET")
+LB_ACCESS_TOKEN = os.getenv("LP_ACCESS_TOKEN")
+
+config = Config(LB_APP_KEY, LB_APP_SECRET, LB_ACCESS_TOKEN)
 quote_ctx = QuoteContext(config)
 
 YEARS = [2021, 2022, 2023, 2024, 2025]
@@ -15,17 +18,12 @@ os.makedirs(BASE_DIR, exist_ok=True)
 
 def download(symbol, year):
     try:
-        klines = quote_ctx.history_candlesticks_by_date(
-            symbol,
-            Period.Day,
-            AdjustType.ForwardAdjust,
-            date(year, 1, 1),
-            date(year, 12, 31),
-        )
+        # 拉1300根覆盖5年，然后过滤出目标年份
+        klines = quote_ctx.candlesticks(symbol, "day", 1300, "forward")
         rows = [{"date": k.timestamp.strftime("%Y-%m-%d"),
                  "open": k.open, "high": k.high, "low": k.low,
                  "close": k.close, "volume": k.volume, "turnover": k.turnover}
-                for k in klines]
+                for k in klines if k.timestamp.year == year]
         return pd.DataFrame(rows) if rows else None
     except Exception:
         return None
