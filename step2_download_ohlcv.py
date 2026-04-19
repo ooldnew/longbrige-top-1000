@@ -4,14 +4,14 @@ import pandas as pd
 from tqdm import tqdm
 from longbridge.openapi import Config, QuoteContext
 
-# ===================== 旧版长桥（你原来能用的） =====================
+# ===================== 【极速版】加速核心 =====================
 LB_APP_KEY = os.getenv("LP_APP_KEY")
 LB_APP_SECRET = os.getenv("LP_APP_SECRET")
 LB_ACCESS_TOKEN = os.getenv("LP_ACCESS_TOKEN")
 
 YEARS = [2021,2022,2023,2024,2025]
 BASE = "us_1000_turnover"
-DELAY = 0.3
+DELAY = 0.05          # 🔥 从 0.3 → 0.05（超快）
 
 config = Config(LB_APP_KEY, LB_APP_SECRET, LB_ACCESS_TOKEN)
 quote_ctx = QuoteContext(config)
@@ -35,7 +35,7 @@ for year in YEARS:
     df = df_all[df_all.year==year].head(1000)
 
     print(f"\n===== {year} 前1000只 =====")
-    for _, row in tqdm(df.iterrows()):
+    for _, row in tqdm(df.iterrows(), total=len(df)):
         sym = row["symbol"]
         path = os.path.join(folder, f"{sym}.csv")
         if os.path.exists(path):
@@ -43,6 +43,8 @@ for year in YEARS:
         df_k = dl(sym, year)
         if df_k is not None and not df_k.empty:
             df_k.to_csv(path, index=False)
+        
+        # 🔥 极速延迟
         time.sleep(DELAY)
 
 print("✅ 全部下载完成！")
