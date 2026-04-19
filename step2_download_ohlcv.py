@@ -4,16 +4,13 @@ from datetime import date
 from tqdm import tqdm
 from longbridge.openapi import Config, QuoteContext, Period, AdjustType
 
-LB_APP_KEY = os.getenv("LP_APP_KEY")
-LB_APP_SECRET = os.getenv("LP_APP_SECRET")
-LB_ACCESS_TOKEN = os.getenv("LP_ACCESS_TOKEN")
+config = Config.from_env()
+quote_ctx = QuoteContext(config)
 
 YEARS = [2021, 2022, 2023, 2024, 2025]
 BASE_DIR = "us_1000_turnover"
 TOP_N = 1000
 
-config = Config(app_key=LB_APP_KEY, app_secret=LB_APP_SECRET, access_token=LB_ACCESS_TOKEN)
-quote_ctx = QuoteContext(config)
 os.makedirs(BASE_DIR, exist_ok=True)
 
 def download(symbol, year):
