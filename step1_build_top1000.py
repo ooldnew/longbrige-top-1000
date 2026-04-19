@@ -4,17 +4,13 @@ from datetime import date
 from tqdm import tqdm
 from longbridge.openapi import Config, QuoteContext, Period, AdjustType
 
-LB_APP_KEY = os.getenv("LP_APP_KEY")
-LB_APP_SECRET = os.getenv("LP_APP_SECRET")
-LB_ACCESS_TOKEN = os.getenv("LP_ACCESS_TOKEN")
+config = Config.from_env()
+ctx = QuoteContext(config)
 
 YEARS = [2021, 2022, 2023, 2024, 2025]
 TOP_N = 1000
 CACHE_FILE = "step1_progress_cache.csv"
 OUTPUT_CSV = "top1000_by_year.csv"
-
-config = Config(app_key=LB_APP_KEY, app_secret=LB_APP_SECRET, access_token=LB_ACCESS_TOKEN)
-ctx = QuoteContext(config)
 
 def get_us_tickers():
     url = "https://raw.githubusercontent.com/Ate329/top-us-stock-tickers/main/tickers/all.csv"
@@ -22,7 +18,6 @@ def get_us_tickers():
     return df[df["symbol"].str.match(r"^[A-Z]{1,5}$", na=False)].symbol.unique()
 
 def get_all_years_turnover(sym):
-    """一次请求拉完2021-2025全部日K，按年汇总turnover"""
     try:
         klines = ctx.history_candlesticks_by_date(
             sym,
@@ -69,7 +64,6 @@ def main():
             pd.DataFrame(rows).to_csv(CACHE_FILE, mode="a", header=False, index=False)
             success_count += 1
         else:
-            # 占位，避免重复请求
             pd.DataFrame([{"year":0,"symbol":sym,"turnover":0}]).to_csv(
                 CACHE_FILE, mode="a", header=False, index=False)
             error_count += 1
