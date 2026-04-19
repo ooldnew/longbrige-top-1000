@@ -19,15 +19,11 @@ jobs:
           pip install --upgrade pip
           pip install longbridge pandas tqdm
 
-      - name: 调试longbridge版本和Config用法
+      - name: 调试longbridge
         run: |
           pip show longbridge
-          python << 'EOF'
-import longbridge
-print('版本:', longbridge.__version__)
-from longbridge.openapi import Config
-print('Config方法:', [m for m in dir(Config) if not m.startswith('_')])
-EOF
+          python -c "import longbridge; print(longbridge.__version__)"
+          python -c "from longbridge.openapi import Config; print([m for m in dir(Config) if not m.startswith('_')])"
 
       - name: 运行 Step1 生成股票名单
         env:
