@@ -2,7 +2,7 @@ import os
 import time
 import pandas as pd
 from tqdm import tqdm
-from longbridge.openapi import Config, QuoteContext
+from longbridge import Config, QuoteContext  # <-- 这里修复了
 
 # ===================== 长桥配置 =====================
 LB_APP_KEY = os.getenv("LB_APP_KEY")
@@ -16,11 +16,11 @@ YEARS = [2021, 2022, 2023, 2024, 2025]
 BASE_DIR = "us_1000_turnover"
 os.makedirs(BASE_DIR, exist_ok=True)
 
-# 限流
-DELAY_SECONDS = 0.25
+# 限流（避免触发限制）
+DELAY_SECONDS = 0.3
 # ====================================================
 
-# 初始化长桥
+# 初始化长桥（已修复）
 config = Config(LB_APP_KEY, LB_APP_SECRET, LB_ACCESS_TOKEN)
 quote_ctx = QuoteContext(config)
 
