@@ -1,9 +1,7 @@
 import os
-import time
 import pandas as pd
-from datetime import date
 from tqdm import tqdm
-from longbridge.openapi import Config, QuoteContext, Period, AdjustType
+from longbridge.openapi import Config, QuoteContext
 
 LB_APP_KEY = os.getenv("LP_APP_KEY")
 LB_APP_SECRET = os.getenv("LP_APP_SECRET")
@@ -11,37 +9,23 @@ LB_ACCESS_TOKEN = os.getenv("LP_ACCESS_TOKEN")
 
 YEARS = [2021, 2022, 2023, 2024, 2025]
 BASE_DIR = "us_1000_turnover"
-DELAY = 0.05
+TOP_N = 1000
 
 config = Config(LB_APP_KEY, LB_APP_SECRET, LB_ACCESS_TOKEN)
 quote_ctx = QuoteContext(config)
 os.makedirs(BASE_DIR, exist_ok=True)
 
 def download(symbol, year):
-    """下载某股票某年的日K，过滤出当年数据"""
     try:
-        # 旧版 API：candlesticks(symbol, period, count, adjust_type)
-        # count=500 足够覆盖一年约252个交易日
-        klines = quote_ctx.candlesticks(
-            symbol,
-            Period.Day,
-            500,
-            AdjustType.ForwardAdjust
+        klines = quote_ctx.history_candlesticks_by_date(
+            symbol, "day", f"{year}-01-01", f"{year}-12-31", adjust_type="forward_adjust"
         )
-        rows = []
-        for k in klines:
-            if k.timestamp.year == year:
-                rows.append({
-                    "date": k.timestamp.strftime("%Y-%m-%d"),
-                    "open": k.open,
-                    "high": k.high,
-                    "low": k.low,
-                    "close": k.close,
-                    "volume": k.volume,
-                    "turnover": k.turnover,
-                })
+        rows = [{"date": k.timestamp.strftime("%Y-%m-%d"),
+                 "open": k.open, "high": k.high, "low": k.low,
+                 "close": k.close, "volume": k.volume, "turnover": k.turnover}
+                for k in klines]
         return pd.DataFrame(rows) if rows else None
-    except Exception as e:
+    except Exception:
         return None
 
 df_all = pd.read_csv("top1000_by_year.csv")
@@ -51,7 +35,7 @@ total_ok = 0
 total_fail = 0
 
 for year in YEARS:
-    df_year = df_all[df_all["year"] == year].head(TOP_N := 1000)
+    df_year = df_all[df_all["year"] == year].head(TOP_N)
     print(f"\n===== {year} 年 共 {len(df_year)} 只 =====")
 
     year_folder = os.path.join(BASE_DIR, str(year))
@@ -73,8 +57,7 @@ for year in YEARS:
             ok += 1
         else:
             fail += 1
-
-        time.sleep(DELAY)
+        # 无 sleep，由长桥SDK自动限流
 
     print(f"{year} 年：成功 {ok}，失败/空 {fail}")
     total_ok += ok
