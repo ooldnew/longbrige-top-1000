@@ -1,7 +1,8 @@
 import os
 import pandas as pd
+from datetime import date
 from tqdm import tqdm
-from longbridge.openapi import Config, QuoteContext
+from longbridge.openapi import Config, QuoteContext, Period, AdjustType
 
 LB_APP_KEY = os.getenv("LP_APP_KEY")
 LB_APP_SECRET = os.getenv("LP_APP_SECRET")
@@ -11,14 +12,18 @@ YEARS = [2021, 2022, 2023, 2024, 2025]
 BASE_DIR = "us_1000_turnover"
 TOP_N = 1000
 
-config = Config(LB_APP_KEY, LB_APP_SECRET, LB_ACCESS_TOKEN)
+config = Config(app_key=LB_APP_KEY, app_secret=LB_APP_SECRET, access_token=LB_ACCESS_TOKEN)
 quote_ctx = QuoteContext(config)
 os.makedirs(BASE_DIR, exist_ok=True)
 
 def download(symbol, year):
     try:
         klines = quote_ctx.history_candlesticks_by_date(
-            symbol, "day", f"{year}-01-01", f"{year}-12-31", adjust_type="forward_adjust"
+            symbol,
+            Period.Day,
+            AdjustType.ForwardAdjust,
+            date(year, 1, 1),
+            date(year, 12, 31),
         )
         rows = [{"date": k.timestamp.strftime("%Y-%m-%d"),
                  "open": k.open, "high": k.high, "low": k.low,
@@ -57,7 +62,6 @@ for year in YEARS:
             ok += 1
         else:
             fail += 1
-        # 无 sleep，由长桥SDK自动限流
 
     print(f"{year} 年：成功 {ok}，失败/空 {fail}")
     total_ok += ok
