@@ -21,7 +21,7 @@ def get_us_tickers():
 
 def get_all_years_turnover(sym):
     try:
-        klines = ctx.candlesticks(sym, Period.Day, 1300, AdjustType.NoAdjust)
+        klines = ctx.candlesticks(sym, Period.Day, 1000, AdjustType.NoAdjust)
         year_sum = {}
         for k in klines:
             y = k.timestamp.year
