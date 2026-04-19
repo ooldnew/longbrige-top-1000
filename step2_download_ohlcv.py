@@ -18,7 +18,7 @@ os.makedirs(BASE_DIR, exist_ok=True)
 
 def download(symbol, year):
     try:
-        klines = quote_ctx.candlesticks(symbol, Period.Day, 1300, AdjustType.ForwardAdjust)
+        klines = quote_ctx.candlesticks(symbol, Period.Day, 1000, AdjustType.ForwardAdjust)
         rows = [{"date": k.timestamp.strftime("%Y-%m-%d"),
                  "open": k.open, "high": k.high, "low": k.low,
                  "close": k.close, "volume": k.volume, "turnover": k.turnover}
