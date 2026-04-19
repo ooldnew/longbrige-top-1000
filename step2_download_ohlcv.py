@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 from tqdm import tqdm
-from longbridge.openapi import Config, QuoteContext
+from longbridge.openapi import Config, QuoteContext, Period, AdjustType
 
 LB_APP_KEY = os.getenv("LP_APP_KEY")
 LB_APP_SECRET = os.getenv("LP_APP_SECRET")
@@ -18,8 +18,7 @@ os.makedirs(BASE_DIR, exist_ok=True)
 
 def download(symbol, year):
     try:
-        # 拉1300根覆盖5年，然后过滤出目标年份
-        klines = quote_ctx.candlesticks(symbol, "day", 1300, "forward")
+        klines = quote_ctx.candlesticks(symbol, Period.Day, 1300, AdjustType.ForwardAdjust)
         rows = [{"date": k.timestamp.strftime("%Y-%m-%d"),
                  "open": k.open, "high": k.high, "low": k.low,
                  "close": k.close, "volume": k.volume, "turnover": k.turnover}
