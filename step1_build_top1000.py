@@ -4,14 +4,14 @@ import os
 from tqdm import tqdm
 from longbridge.openapi import Config, QuoteContext
 
-# ===================== 【极速版】加速核心 =====================
+# ===================== 极速配置 =====================
 LB_APP_KEY = os.getenv("LP_APP_KEY")
 LB_APP_SECRET = os.getenv("LP_APP_SECRET")
 LB_ACCESS_TOKEN = os.getenv("LP_ACCESS_TOKEN")
 
-YEARS = [2021, 2022, 2023, 2024, 2025]
+YEARS = [2021,2022,2023,2024,2025]
 TOP_N = 1000
-DELAY = 0.05           # 🔥 从 0.2 → 0.05（超快）
+DELAY = 0.05
 CACHE_FILE = "step1_progress_cache.csv"
 OUTPUT_CSV = "top1000_by_year.csv"
 
@@ -19,7 +19,7 @@ OUTPUT_CSV = "top1000_by_year.csv"
 config = Config(LB_APP_KEY, LB_APP_SECRET, LB_ACCESS_TOKEN)
 ctx = QuoteContext(config)
 
-# ===================== 获取股票列表 =====================
+# ===================== 股票列表 =====================
 def get_us_tickers():
     url = "https://raw.githubusercontent.com/Ate329/top-us-stock-tickers/main/tickers/all.csv"
     df = pd.read_csv(url)
@@ -31,10 +31,11 @@ def main():
     done = set()
 
     if not os.path.exists(CACHE_FILE):
-        pd.DataFrame(columns=["year", "symbol", "turnover"]).to_csv(CACHE_FILE, index=False)
+        pd.DataFrame(columns=["year","symbol","turnover"]).to_csv(CACHE_FILE, index=False)
 
     try:
-        done = set(pd.read_csv(CACHE_FILE)["symbol"].str.replace(".US", "").tolist())
+        df_cache = pd.read_csv(CACHE_FILE)
+        done = set(df_cache["symbol"].str.replace(".US","").tolist())
     except:
         done = set()
 
@@ -51,25 +52,25 @@ def main():
                 if y in YEARS:
                     year_sum[y] = year_sum.get(y, 0.0) + float(k.turnover)
 
-            rows = [{"year": y, "symbol": sym, "turnover": v} for y, v in year_sum.items()]
+            rows = [{"year":y,"symbol":sym,"turnover":v} for y,v in year_sum.items()]
             pd.DataFrame(rows).to_csv(CACHE_FILE, mode="a", header=False, index=False)
-        except Exception as e:
+        except:
             pass
-        
-        # 🔥 极速延迟（不触发限流，又超快）
+
         time.sleep(DELAY)
 
-    # 生成每年 TOP1000
+    # ===================== 强制生成 TOP1000 =====================
     df = pd.read_csv(CACHE_FILE)
     final = []
     for y in YEARS:
-        year_data = df[df["year"] == y].copy()
-        year_data = year_data.sort_values("turnover", ascending=False)
-        top = year_data.head(TOP_N)
+        year_df = df[df["year"] == y].copy()
+        year_df = year_df.sort_values("turnover", ascending=False)
+        top = year_df.head(TOP_N)
         final.append(top)
 
-    pd.concat(final).to_csv(OUTPUT_CSV, index=False)
-    print(f"✅ 生成完成：{OUTPUT_CSV}")
+    final_df = pd.concat(final)
+    final_df.to_csv(OUTPUT_CSV, index=False)
+    print(f"✅ 已生成：{OUTPUT_CSV}，共 {len(final_df)} 行（每年1000只）")
 
 if __name__ == "__main__":
     main()
