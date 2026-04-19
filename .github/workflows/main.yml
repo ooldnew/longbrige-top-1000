@@ -14,7 +14,7 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: 安装旧版长桥
+      - name: 安装依赖
         run: |
           pip install --upgrade pip
           pip install "longbridge<3.0.0" pandas tqdm
@@ -25,6 +25,13 @@ jobs:
           LP_APP_SECRET: ${{ secrets.LP_APP_SECRET }}
           LP_ACCESS_TOKEN: ${{ secrets.LP_ACCESS_TOKEN }}
         run: python step1_build_top1000.py
+
+      - name: 检查 Step1 输出
+        run: |
+          echo "=== top1000_by_year.csv 行数 ==="
+          wc -l top1000_by_year.csv
+          echo "=== 前5行 ==="
+          head -5 top1000_by_year.csv
 
       - name: 运行 Step2 下载行情
         env:
